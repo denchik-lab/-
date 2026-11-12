@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Справочник — Dota 2 Draft Helper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .wiki-container { width: 100%; max-width: 1100px; padding: 30px 20px; }
+        .search-box {
+            width: 100%; max-width: 500px; padding: 14px 20px; border-radius: 50px;
+            border: 2px solid #32373e; background: #16191e; color: #fff;
+            font-size: 15px; font-weight: 600; outline: none; margin: 0 auto 25px auto; display: block;
+        }
+        .search-box:focus { border-color: #ff4500; }
+        .wiki-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .wiki-card { background: #16191e; border: 2px solid #282d34; border-radius: 12px; padding: 20px; text-align: left; }
+        .wiki-card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #282d34; }
+        .wiki-card-header img { width: 85px; height: 48px; border-radius: 6px; object-fit: cover; }
+        .wiki-title { font-size: 18px; font-weight: 800; color: #fff; }
+        .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; margin-top: 4px; }
+        .badge-str { background: rgba(255, 77, 77, 0.2); color: #ff4d4d; }
+        .badge-agi { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+        .badge-int { background: rgba(0, 188, 255, 0.2); color: #00bcff; }
+        .badge-item { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
+
+        .tier-1-badge { background: rgba(149, 165, 166, 0.2); color: #bdc3c7; }
+        .tier-2-badge { background: rgba(46, 204, 113, 0.2); color: #2ecc71; }
+        .tier-3-badge { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+        .tier-4-badge { background: rgba(155, 89, 182, 0.2); color: #bb8fce; }
+        .tier-5-badge { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
+
+        .tier-1-img { border: 2px solid #95a5a6; box-shadow: 0 0 10px rgba(149, 165, 166, 0.3); }
+        .tier-2-img { border: 2px solid #2ecc71; box-shadow: 0 0 10px rgba(46, 204, 113, 0.3); }
+        .tier-3-img { border: 2px solid #3498db; box-shadow: 0 0 10px rgba(52, 152, 219, 0.3); }
+        .tier-4-img { border: 2px solid #9b59b6; box-shadow: 0 0 10px rgba(155, 89, 182, 0.3); }
+        .tier-5-img { border: 2px solid #f1c40f; box-shadow: 0 0 12px rgba(241, 196, 15, 0.4); }
+
+        .counter-list { font-size: 13px; color: #b0b3b8; line-height: 1.5; }
+        .counter-list strong { color: #f1c40f; }
+        .hidden { display: none !important; }
+    </style>
+    <script>
+        var curTab = 'heroes';
+        var curAttr = 'all';
+
+        function filterWiki() {
+            var q = document.getElementById('wiki-search').value.toLowerCase().trim();
+            var cards = document.getElementsByClassName('card-entry');
+            for (var i = 0; i < cards.length; i++) {
+                var c = cards[i];
+                var okTab = (c.dataset.group === curTab);
+                var okName = (c.dataset.name.indexOf(q) !== -1);
+                var okAttr = (curTab !== 'heroes' || curAttr === 'all' || c.dataset.attr === curAttr);
+                c.classList.toggle('hidden', !(okTab && okName && okAttr));
+            }
+        }
+
+        function setTab(t) {
+            curTab = t;
+            document.getElementById('tab-heroes').classList.toggle('hidden', t !== 'heroes');
+            document.getElementById('tab-items').classList.toggle('hidden', t !== 'items');
+            document.getElementById('tab-neutrals').classList.toggle('hidden', t !== 'neutrals');
+            document.getElementById('attr-bar').classList.toggle('hidden', t !== 'heroes');
+            document.getElementById('btn-heroes').classList.toggle('active-tab', t === 'heroes');
+            document.getElementById('btn-items').classList.toggle('active-tab', t === 'items');
+            document.getElementById('btn-neutrals').classList.toggle('active-tab', t === 'neutrals');
+            filterWiki();
+        }
+
+        function setAttr(a, el) {
+            curAttr = a;
+            var btns = document.getElementsByClassName('attr-btn');
+            for (var i = 0; i < btns.length; i++) { btns[i].classList.remove('active-tab'); }
+            el.classList.add('active-tab');
+            filterWiki();
+        }
+    </script>
+</head>
+<body>
+<!-- Панель переключения тем в правом верхнем углу -->
+<div style="position: fixed; top: 15px; right: 15px; z-index: 1000; display: flex; gap: 6px; background: rgba(0,0,0,0.6); padding: 6px; border-radius: 8px; backdrop-filter: blur(5px);">
+    <button type="button" onclick="setTheme('default')" title="Классика Dota" style="cursor: pointer; border: none; background: #2d3138; color: white; padding: 6px 10px; border-radius: 5px; font-weight: bold;">🔥 Dota</button>
+    <button type="button" onclick="setTheme('neon')" title="Кибер-Неон" style="cursor: pointer; border: none; background: #5a189a; color: #00f5d4; padding: 6px 10px; border-radius: 5px; font-weight: bold;">⚡ Неон</button>
+    <button type="button" onclick="setTheme('light')" title="Светлая для проектора" style="cursor: pointer; border: none; background: #f8fafc; color: #0f172a; padding: 6px 10px; border-radius: 5px; font-weight: bold;">☀️ Светлая</button>
+</div>
+
+<script>
+    function setTheme(themeName) {
+        document.body.classList.remove('theme-neon', 'theme-light');
+        if (themeName !== 'default') {
+            document.body.classList.add('theme-' + themeName);
+        }
+        localStorage.setItem('dota_site_theme', themeName);
+    }
+    // Автоматически применяем сохранённую тему при загрузке страницы
+    const savedTheme = localStorage.getItem('dota_site_theme');
+    if (savedTheme) setTheme(savedTheme);
+</script>
+
+
+    {% set shop_items = items | rejectattr('type', 'equalto', 'neutral') | list %}
+    {% set neutral_items = items | selectattr('type', 'equalto', 'neutral') | list %}
+
+    <header>
+        <h1>📖 Справочник Dota 2</h1>
+
+        <div class="filter-tabs" style="margin-top: 0; margin-bottom: 15px;">
+            <a href="{{ url_for('index', mode='heroes') }}" class="tab-btn">⬅ Вернуться в викторину</a>
+            <button type="button" id="btn-heroes" class="tab-btn active-tab" onclick="setTab('heroes')">👤 Герои ({{ heroes|length }})</button>
+            <button type="button" id="btn-items" class="tab-btn" onclick="setTab('items')">📦 Предметы ({{ shop_items|length }})</button>
+            <button type="button" id="btn-neutrals" class="tab-btn" onclick="setTab('neutrals')">🌲 Нейтральные ({{ neutral_items|length }})</button>
+        </div>
+
+        <div id="attr-bar" class="filter-tabs" style="margin-top: 10px;">
+            <button type="button" class="tab-btn active-tab attr-btn" onclick="setAttr('all', this)">Все атрибуты</button>
+            <button type="button" class="tab-btn attr-btn" onclick="setAttr('str', this)">🔴 Сила</button>
+            <button type="button" class="tab-btn attr-btn" onclick="setAttr('agi', this)">🟢 Ловкость</button>
+            <button type="button" class="tab-btn attr-btn" onclick="setAttr('int', this)">🔵 Интеллект</button>
+        </div>
+    </header>
+
+    <div class="wiki-container">
+        <input type="text" id="wiki-search" class="search-box" placeholder="🔍 Начните вводить название..." oninput="filterWiki()">
+
+        <div id="tab-heroes" class="wiki-grid">
+            {% for hero in heroes %}
+            <div class="wiki-card card-entry" data-group="heroes" data-name="{{ hero.name|lower }}" data-attr="{{ hero.type }}">
+                <div class="wiki-card-header">
+                    {% if hero.img_src %}<img src="{{ hero.img_src }}" alt="{{ hero.name }}" class="img-{{ hero.type }}">{% endif %}
+                    <div>
+                        <div class="wiki-title">{{ hero.name }}</div>
+                        {% if hero.type == 'str' %}<span class="badge badge-str">Сила • {{ hero.tag }}</span>{% endif %}
+                        {% if hero.type == 'agi' %}<span class="badge badge-agi">Ловкость • {{ hero.tag }}</span>{% endif %}
+                        {% if hero.type == 'int' %}<span class="badge badge-int">Интеллект • {{ hero.tag }}</span>{% endif %}
+                    </div>
+                </div>
+                <div class="counter-list">
+                    <div style="margin-bottom: 6px; color: #8a909a; font-weight: 700; font-size: 12px; text-transform: uppercase;">Лучшие контрпики:</div>
+                    {% for c_name, reason in hero.reasons.items() %}
+                    <div style="margin-bottom: 4px;">• <strong>{{ c_name }}</strong> — {{ reason }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="tab-items" class="wiki-grid hidden">
+            {% for item in shop_items %}
+            <div class="wiki-card card-entry" data-group="items" data-name="{{ item.name|lower }}" data-attr="all">
+                <div class="wiki-card-header">
+                    {% if item.img_src %}<img src="{{ item.img_src }}" alt="{{ item.name }}" style="border: 2px solid #f1c40f;" onerror="this.style.display='none'">{% endif %}
+                    <div>
+                        <div class="wiki-title">{{ item.name }}</div>
+                        <span class="badge badge-item">Предмет из лавки</span>
+                    </div>
+                </div>
+                <div class="counter-list" style="color: #d1d4d9;">{{ item.desc }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="tab-neutrals" class="wiki-grid hidden">
+            {% for item in neutral_items %}
+                {% set tier = '1' %}
+                {% if '[Разряд 2]' in item.desc %}{% set tier = '2' %}{% endif %}
+                {% if '[Разряд 3]' in item.desc %}{% set tier = '3' %}{% endif %}
+                {% if '[Разряд 4]' in item.desc %}{% set tier = '4' %}{% endif %}
+                {% if '[Разряд 5]' in item.desc %}{% set tier = '5' %}{% endif %}
+            <div class="wiki-card card-entry" data-group="neutrals" data-name="{{ item.name|lower }}" data-attr="all">
+                <div class="wiki-card-header">
+                    {% if item.img_src %}<img src="{{ item.img_src }}" alt="{{ item.name }}" class="tier-{{ tier }}-img" onerror="this.style.display='none'">{% endif %}
+                    <div>
+                        <div class="wiki-title">{{ item.name }}</div>
+                        <span class="badge tier-{{ tier }}-badge">Разряд {{ tier }}</span>
+                    </div>
+                </div>
+                <div class="counter-list" style="color: #d1d4d9;">{{ item.desc.replace('[Разряд ' + tier + '] ', '') }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</body>
+</html>
