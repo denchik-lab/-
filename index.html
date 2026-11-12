@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dota 2 Draft Helper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<!-- Панель переключения тем в правом верхнем углу -->
+<div style="position: fixed; top: 15px; right: 15px; z-index: 1000; display: flex; gap: 6px; background: rgba(0,0,0,0.6); padding: 6px; border-radius: 8px; backdrop-filter: blur(5px);">
+    <button type="button" onclick="setTheme('default')" title="Классика Dota" style="cursor: pointer; border: none; background: #2d3138; color: white; padding: 6px 10px; border-radius: 5px; font-weight: bold;">🔥 Dota</button>
+    <button type="button" onclick="setTheme('neon')" title="Кибер-Неон" style="cursor: pointer; border: none; background: #5a189a; color: #00f5d4; padding: 6px 10px; border-radius: 5px; font-weight: bold;">⚡ Неон</button>
+    <button type="button" onclick="setTheme('light')" title="Светлая для проектора" style="cursor: pointer; border: none; background: #f8fafc; color: #0f172a; padding: 6px 10px; border-radius: 5px; font-weight: bold;">☀️ Светлая</button>
+</div>
+
+<script>
+    function setTheme(themeName) {
+        document.body.classList.remove('theme-neon', 'theme-light');
+        if (themeName !== 'default') {
+            document.body.classList.add('theme-' + themeName);
+        }
+        localStorage.setItem('dota_site_theme', themeName);
+    }
+    // Автоматически применяем сохранённую тему при загрузке страницы
+    const savedTheme = localStorage.getItem('dota_site_theme');
+    if (savedTheme) setTheme(savedTheme);
+</script>
+
+
+    <header>
+        <div style="margin-top: 12px; display: flex; justify-content: center; gap: 8px;">
+    <a href="/?mode={{ current_mode }}&filter={{ current_filter }}&diff=easy" class="tab-btn {% if current_diff == 'easy' %}active-tab{% endif %}" style="padding: 6px 12px; font-size: 12px;">🌱 Новичок (30с)</a>
+    <a href="/?mode={{ current_mode }}&filter={{ current_filter }}&diff=normal" class="tab-btn {% if current_diff == 'normal' %}active-tab{% endif %}" style="padding: 6px 12px; font-size: 12px;">⚔️ Обычный (15с)</a>
+    <a href="/?mode={{ current_mode }}&filter={{ current_filter }}&diff=hard" class="tab-btn {% if current_diff == 'hard' %}active-tab{% endif %}" style="padding: 6px 12px; font-size: 12px;">🔥 Киберспорт (7с)</a>
+</div>
+        <input type="hidden" name="current_diff" value="{{ current_diff }}">
+
+        <h1>⚔ Dota 2 Draft Helper ⚔</h1>
+
+        <div class="filter-tabs" style="margin-bottom: 15px; margin-top: 0;">
+            <a href="{{ url_for('index', mode='heroes', filter=current_filter) }}"
+               class="tab-btn {% if current_mode != 'items' %}active-tab{% endif %}">👤 Режим Героев</a>
+            <a href="{{ url_for('index', mode='items') }}"
+               class="tab-btn {% if current_mode == 'items' %}active-tab{% endif %}">📦 Режим Предметов</a>
+            <a href="{{ url_for('wiki') }}"
+               class="tab-btn">📖 Справочник</a>
+        </div>
+
+        <div class="score-board">
+            <span style="color: #f1c40f;">{{ rank_name }} ({{ score.mmr }} MMR)</span>
+            <span>|</span>
+            <span>Счет: {{ score.correct }} / {{ score.total }}</span>
+            <span>|</span>
+            <span>🏆 Рекорд: {{ high_score }}</span>
+        </div>
+
+        <!-- Шкала прогресса до следующего ранга -->
+        <div style="max-width: 420px; margin: 12px auto 0 auto;">
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #8a909a; margin-bottom: 4px; font-weight: 700;">
+                <span>{{ rank_name }} ({{ score.mmr }})</span>
+                <span>{{ rank_percent }}% до «{{ next_rank }}» ({{ next_mmr }})</span>
+            </div>
+            <div style="width: 100%; height: 8px; background: #1c1f24; border-radius: 10px; overflow: hidden; border: 1px solid #2d3138;">
+                <div style="width: {{ rank_percent }}%; height: 100%; background: linear-gradient(90deg, #f1c40f, #ff8c00); border-radius: 10px; transition: width 0.4s ease;"></div>
+            </div>
+        </div>
+
+        {% if current_mode != 'items' %}
+        <div class="filter-tabs">
+            <a href="{{ url_for('index', mode='heroes', filter='all') }}"
+               class="tab-btn {% if current_filter == 'all' %}active-tab{% endif %}">Все герои</a>
+            <a href="{{ url_for('index', mode='heroes', filter='str') }}"
+               class="tab-btn {% if current_filter == 'str' %}active-tab{% endif %}">🔴 Сила</a>
+            <a href="{{ url_for('index', mode='heroes', filter='agi') }}"
+               class="tab-btn {% if current_filter == 'agi' %}active-tab{% endif %}">🟢 Ловкость</a>
+            <a href="{{ url_for('index', mode='heroes', filter='int') }}"
+               class="tab-btn {% if current_filter == 'int' %}active-tab{% endif %}">🔵 Интеллект</a>
+        </div>
+        {% endif %}
+    </header>
+
+    <div style="width: 100%; height: 6px; background: #1c1f24;">
+        <div id="timer-bar" class="timer-{{ enemy_type }}" style="width: 100%; height: 100%; transition: width 1s linear;"></div>
+    </div>
+
+    <main>
+        {% if rune_title %}
+        <div style="background: rgba(241, 196, 15, 0.15); border: 1px solid #f1c40f; color: #f1c40f; padding: 10px 25px; border-radius: 50px; margin-bottom: 20px; font-weight: bold; animation: pulse 2s infinite;">
+            {{ rune_title }}
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div style="position: absolute; top: 15px; right: 20px; font-size: 20px; font-weight: 800; color: #ff4500;" id="timer-text">
+                {{ max_time }}
+            </div>
+
+            <div class="alert-title">
+                {% if current_mode == 'items' %}Артефакт на проверке:{% else %}Враг выбирает:{% endif %}
+            </div>
+
+            {% if enemy_url %}
+            <img src="{{ enemy_url }}" alt="{{ enemy }}" class="enemy-img img-{{ enemy_type }}">
+            {% endif %}
+
+            <div class="enemy-name">{{ enemy }}</div>
+            <p style="color: #8a909a; font-size: 13px; margin-top: 8px;">
+                {% if current_mode == 'items' %}Какое описание идеально подходит этому предмету?{% else %}Кого пикнешь против него?{% endif %}
+            </p>
+
+            <form id="quiz-form" action="{{ url_for('check') }}" method="POST">
+                <input type="hidden" name="enemy" value="{{ enemy_key }}">
+                <input type="hidden" name="enemy_type" value="{{ enemy_type }}">
+                <input type="hidden" name="enemy_tag" value="{{ enemy_tag }}">
+                <input type="hidden" name="current_filter" value="{{ current_filter }}">
+                <input type="hidden" name="active_rune" value="{{ active_rune }}">
+                <input type="hidden" name="current_mode" value="{{ current_mode }}">
+                <input type="hidden" id="timeout-input" name="choice" value="" disabled>
+
+                <div class="options-grid" {% if current_mode == 'items' %}style="grid-template-columns: 1fr;"{% endif %}>
+                    {% for option in options %}
+                    <button type="submit" name="choice" value="{{ option.key }}" class="hero-card-btn">
+                        {% if option.img_src %}
+                        <img src="{{ option.img_src }}" alt="{{ option.name }}">
+                        {% endif %}
+                        <span>{{ option.name }}</span>
+                    </button>
+                    {% endfor %}
+                </div>
+            </form>
+
+            <div style="margin-top: 25px;">
+                <a href="{{ url_for('reset') }}" class="reset-link">Сбросить статистику</a>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const maxTime = {{ max_time }};
+        let timeLeft = maxTime;
+        const timerText = document.getElementById('timer-text');
+        const timerBar = document.getElementById('timer-bar');
+        const form = document.getElementById('quiz-form');
+        const timeoutInput = document.getElementById('timeout-input');
+
+        const countdown = setInterval(() => {
+            timeLeft--;
+            timerText.textContent = timeLeft;
+            timerBar.style.width = (timeLeft / maxTime * 100) + '%';
+
+            if (timeLeft <= 0) {
+                clearInterval(countdown);
+                timeoutInput.disabled = false;
+                timeoutInput.value = 'timeout';
+                form.submit();
+            }
+        }, 1000);
+    </script>
+
+</body>
+</html>
